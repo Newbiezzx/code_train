@@ -29,6 +29,7 @@ class GaussianDiffusion(nn.Module):
 
         self.model = model
         self.ema_model = deepcopy(model)
+        self.img_channels = img_channels
 
         self.ema = EMA(ema_decay)
         self.ema_decay = ema_decay
@@ -69,18 +70,29 @@ class GaussianDiffusion(nn.Module):
         if use_ema:
             return (
                 (x - extract(self.remove_noise_coffe, t, x.shape) * self.ema_model(x, t, y)) *
-                extract(self.reciprocal_sqrt_alphas, t, x_shape)
+                extract(self.reciprocal_sqrt_alphas, t, x.shape)
             )
         else:
             return (
                 (x - extract(self.remove_noise_coffe, t, x.shape) * self.model(x, t, y)) *
-                extract(self.reciprocal_sqrt_alphas, t, x_shape)
+                extract(self.reciprocal_sqrt_alphas, t, x.shape)
             )
     
     @torch.no_grad
     def sample(self, batch_size:int, devide:str, y=None, use_ema=True):
         if y is not None and batch_size != len(y):
             raise ValueError("sample batch size different from length of given y")
+        
+        x = torch.randn((batch_size, self.img_channels, ))
+        
+        for t in range(self.num_timestep-1, -1, -1):
+            t_batch = torch.tensor([t], device=devide).repeat(batch_size)
+            x = self.remove_noise(x, t_batch, y, use_ema)
+        
+            if t > 0:
+                x += extract(self.sigma, t_batch, x.shape) * torch.randn_like(x)
+        return x.cpu().detach()
+        
 class EMA():
     def __init__(self, decay) -> None:
         self.decay = decay
