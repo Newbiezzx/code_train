@@ -31,14 +31,6 @@ class GaussianDiffusion(nn.Module):
         self.ema = EMA(ema_decay)
 
 class EMA():
-    """
-    @description  :
-    ---------
-    @param  :
-    -------
-    @Returns  :
-    -------
-    """
     def __init__(self, decay) -> None:
         self.decay = decay
     
@@ -51,7 +43,11 @@ class EMA():
         for current_params, ema_params in zip(current_model.parameters(), ema_model.parameters()):
             old, new = ema_params.data, current_params.data
             ema_params.data = self.updata_average(old, new)
+
+
     
-if __name__ == "__main__":
-    model = GaussianDiffusion()
-    print(model.__call__())
+    
+
+
+
+
