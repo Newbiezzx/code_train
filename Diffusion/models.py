@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from functools import partial
 from copy import deepcopy
 
-from .utils import extract
+from utils import extract
 
 class GaussianDiffusion(nn.Module):
     """
@@ -79,20 +79,85 @@ class GaussianDiffusion(nn.Module):
             )
     
     @torch.no_grad
-    def sample(self, batch_size:int, devide:str, y=None, use_ema=True):
+    def sample(self, batch_size:int, device:str, y=None, use_ema=True):
         if y is not None and batch_size != len(y):
             raise ValueError("sample batch size different from length of given y")
         
-        x = torch.randn((batch_size, self.img_channels, ))
+        x = torch.randn(batch_size, self.img_channels, *self.img_size, device=device)
         
         for t in range(self.num_timestep-1, -1, -1):
-            t_batch = torch.tensor([t], device=devide).repeat(batch_size)
+            t_batch = torch.tensor([t], device=device).repeat(batch_size)
             x = self.remove_noise(x, t_batch, y, use_ema)
         
             if t > 0:
                 x += extract(self.sigma, t_batch, x.shape) * torch.randn_like(x)
         return x.cpu().detach()
+    
+    @torch.no_grad
+    def sample_diffusion_sequence(self, batch_size, device, y=None, use_ema=True):
+        if y is not None and batch_size != len(y):
+            raise ValueError("sample batch size different from length of given y")
         
+        x = torch.randn(batch_size, self.img_channels, *self.img_size, device=device)
+        diffusion_sequence = [x.cpu().detach]
+        
+        for t in range(self.num_timestep-1, -1, -1):
+            t_batch = torch.tensor([t], device=device).repeat(batch_size)
+            x = self.remove_noise(x, t_batch, y, use_ema)
+        
+            if t > 0:
+                x += extract(self.sigma, t_batch, x.shape) * torch.randn_like(x)
+            diffusion_sequence.append(x.cpu().detach())  
+        return diffusion_sequence
+    
+    def preturb_x(self, x, t, noise):
+        return(
+            extract(self.sqrt_alphas_cumprod, t, x.shape) * x + 
+            extract(self.sqrt_one_minus_alphas_cumprod, t, x.shape) * noise
+        )
+        
+    def get_losses(self, x, t, y):
+        noise = torch.randn_like(x)
+        preturb_x = self.preturb_x(x, t, noise)
+        estimated_noise = self.model(preturb_x, t, y)
+        if self.loss_type == "l1":
+            loss = F.l1_loss(estimated_noise, noise)
+        else:
+            loss = F.mse_loss(estimated_noise, noise)
+        return loss
+    
+    def forward(self, x, y=None):
+        b, c, h, w = x.shape
+        device = device
+        
+        if h != self.img_size[0]:
+            raise ValueError("image height does not match diffusion parameters")
+        if w != self.img_size[1]:
+            raise ValueError("image width does not match diffusion parameters")
+        
+        t = torch.randint(0, self.num_timestep, (b,), device=device)
+        return self.get_losses(x, t, y)
+    
+def generate_cosine_schedule(T:int, s=0.008):
+    def f(t, T):
+        return (np.cos((t / T + s) / (1 + s) * np.pi / 2)) ** 2
+    
+    alphas = []
+    f0 = f(0, T)
+    for t in range(T+1):
+        alphas.append(f(t, T) / f0)
+    betas = []
+    
+    for t in range(1, T+1):
+        betas.append(min(1 - alphas[t] / alphas[t - 1], 0.999))
+    
+    return np.array(betas)
+
+def generate_linear_schedule(T, low, high):
+    return np.linspace(low, high, T)
+        
+        
+  
 class EMA():
     def __init__(self, decay) -> None:
         self.decay = decay
@@ -108,6 +173,7 @@ class EMA():
             ema_params.data = self.updata_average(old, new)   
     
 
-
+if __name__ == "__main__":
+    model = GaussianDiffusion(nn.Module, 3, (512,512), 10, 0.9)
 
 
