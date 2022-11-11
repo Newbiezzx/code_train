@@ -22,8 +22,8 @@ class GaussianDiffusion(nn.Module):
     scalar loss tensor
     -------
     """
-    def __init__(self, model:nn.Module, img_channels:int, img_size, \
-        num_classes:int, betas:float, loss_type='l2', ema_decay=0.9999,\
+    def __init__(self, model:nn.Module, img_channels:int, *img_size, \
+        num_classes:int, betas:np.ndarray, loss_type='l2', ema_decay=0.9999,\
         ema_start=5000, ema_update_rate=1) -> None:
         super().__init__()
 
@@ -45,8 +45,8 @@ class GaussianDiffusion(nn.Module):
         self.num_timestep = len(betas)
 
         alphas =  1 - betas
-        alphas_cumprod = np.cumprod(alphas)
-        to_torch = partial(torch.tensor, dytype=torch.float32)
+        alphas_cumprod = np.cumprod(alphas) # 连乘函数\bar{alpha}
+        to_torch = partial(torch.tensor, dtype=torch.float32) # 将函数转为tensor
 
         self.register_buffer("betas", to_torch(betas))
         self.register_buffer("alphas", to_torch(alphas))
@@ -65,20 +65,20 @@ class GaussianDiffusion(nn.Module):
             else:
                 self.ema.update_model_average(self.ema_model, self.model)
     
-    @torch.no_grad           
-    def remove_noise(self, x, t, y, use_ema=True):
+    @torch.no_grad()
+    def remove_noise(self, x, t:int, y, use_ema=True):
         if use_ema:
             return (
-                (x - extract(self.remove_noise_coffe, t, x.shape) * self.ema_model(x, t, y)) *
+                (x - extract(self.remove_noise_coeff, t, x.shape) * self.ema_model(x, t, y)) *
                 extract(self.reciprocal_sqrt_alphas, t, x.shape)
             )
         else:
             return (
-                (x - extract(self.remove_noise_coffe, t, x.shape) * self.model(x, t, y)) *
+                (x - extract(self.remove_noise_coeff, t, x.shape) * self.model(x, t, y)) *
                 extract(self.reciprocal_sqrt_alphas, t, x.shape)
             )
     
-    @torch.no_grad
+    @torch.no_grad()
     def sample(self, batch_size:int, device:str, y=None, use_ema=True):
         if y is not None and batch_size != len(y):
             raise ValueError("sample batch size different from length of given y")
@@ -93,7 +93,7 @@ class GaussianDiffusion(nn.Module):
                 x += extract(self.sigma, t_batch, x.shape) * torch.randn_like(x)
         return x.cpu().detach()
     
-    @torch.no_grad
+    @torch.no_grad()
     def sample_diffusion_sequence(self, batch_size, device, y=None, use_ema=True):
         if y is not None and batch_size != len(y):
             raise ValueError("sample batch size different from length of given y")
@@ -128,7 +128,7 @@ class GaussianDiffusion(nn.Module):
     
     def forward(self, x, y=None):
         b, c, h, w = x.shape
-        device = device
+        device = x.device
         
         if h != self.img_size[0]:
             raise ValueError("image height does not match diffusion parameters")
@@ -153,7 +153,7 @@ def generate_cosine_schedule(T:int, s=0.008):
     
     return np.array(betas)
 
-def generate_linear_schedule(T, low, high):
+def generate_linear_schedule(T:int, low, high):
     return np.linspace(low, high, T)
         
         
@@ -174,6 +174,8 @@ class EMA():
     
 
 if __name__ == "__main__":
-    model = GaussianDiffusion(nn.Module, 3, (512,512), 10, 0.9)
+    betas = generate_linear_schedule(100, 0.99, 0.9)
+    model = GaussianDiffusion(nn.Module, 3, 32, 32, num_classes=10, betas=betas)
+    y = model(torch.randn(1, 3, 32, 32))
 
 

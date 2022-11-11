@@ -38,7 +38,7 @@ class PositionalEmbedding(nn.Module):
         return emb
     
 class Downsample(nn.Module):
-    __doc__ = r"""Downsamples a given tensor by a factor of 2. Uses strided convolution. Assumes even height and width.
+    __doc__="""Downsamples a given tensor by a factor of 2. Uses strided convolution. Assumes even height and width.
     Input:
         x: tensor of shape (N, in_channels, H, W)
         time_emb: ignored
@@ -64,7 +64,7 @@ class Downsample(nn.Module):
 
 
 class Upsample(nn.Module):
-    __doc__ = r"""Upsamples a given tensor by a factor of 2. Uses resize convolution to avoid checkerboard artifacts.
+    __doc__="""Upsamples a given tensor by a factor of 2. Uses resize convolution to avoid checkerboard artifacts.
     Input:
         x: tensor of shape (N, in_channels, H, W)
         time_emb: ignored
@@ -88,7 +88,7 @@ class Upsample(nn.Module):
 
 
 class AttentionBlock(nn.Module):
-    __doc__ = r"""Applies QKV self-attention with a residual connection.
+    __doc__="""Applies QKV self-attention with a residual connection.
     
     Input:
         x: tensor of shape (N, in_channels, H, W)
@@ -99,7 +99,7 @@ class AttentionBlock(nn.Module):
     Args:
         in_channels (int): number of input channels
     """
-    def __init__(self, in_channels, norm="gn", num_groups=32):
+    def __init__(self, in_channels, norm="groupnorm", num_groups=32):
         super().__init__()
         
         self.in_channels = in_channels
@@ -127,7 +127,7 @@ class AttentionBlock(nn.Module):
 
 
 class ResidualBlock(nn.Module):
-    __doc__ = r"""Applies two conv blocks with resudual connection. Adds time and class conditioning by adding bias after first convolution.
+    __doc__="""Applies two conv blocks with resudual connection. Adds time and class conditioning by adding bias after first convolution.
     Input:
         x: tensor of shape (N, in_channels, H, W)
         time_emb: time embedding tensor of shape (N, time_emb_dim) or None if the block doesn't use time conditioning
@@ -145,18 +145,8 @@ class ResidualBlock(nn.Module):
         use_attention (bool): if True applies AttentionBlock to the output. Default: False
     """
 
-    def __init__(
-        self,
-        in_channels,
-        out_channels,
-        dropout,
-        time_emb_dim=None,
-        num_classes=None,
-        activation=F.relu,
-        norm="gn",
-        num_groups=32,
-        use_attention=False,
-    ):
+    def __init__(self, in_channels, out_channels, dropout, time_emb_dim=None, num_classes=None,
+        activation=F.relu, norm="groupnorm", num_groups=32, use_attention=False):
         super().__init__()
 
         self.activation = activation
@@ -370,8 +360,4 @@ class UNet(nn.Module):
             return x[:, :, ip:-ip, ip:-ip]
         else:
             return x
-
-class Resnet(nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
         

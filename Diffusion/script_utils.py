@@ -2,8 +2,8 @@ import argparse
 import torchvision
 import torch.nn.functional as F
 
-from .unet import UNet
-from .diffusion import (
+from unet import UNet
+from models import (
     GaussianDiffusion,
     generate_linear_schedule,
     generate_cosine_schedule,
@@ -67,7 +67,7 @@ def diffusion_defaults():
         channel_mults=(1, 2, 2, 2),
         num_res_blocks=2,
         time_emb_dim=128 * 4,
-        norm="gn",
+        norm="groupnorm",
         dropout=0.1,
         activation="silu",
         attention_resolutions=(1,),
